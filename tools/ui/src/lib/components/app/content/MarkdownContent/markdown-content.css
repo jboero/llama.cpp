@@ -470,6 +470,7 @@ div.markdown-user-content :global(.table-wrapper) {
 
 /* Scrollable tables */
 .markdown-content :global(.table-wrapper) {
+    display: block; /* Render images as images */
 	overflow-x: auto;
 	margin: 1.5rem 0;
 	border-radius: 0.5rem;
