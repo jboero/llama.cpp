@@ -1401,6 +1401,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         params.n_parallel = -1;     // auto by default
     } else if (ex == LLAMA_EXAMPLE_TOKENIZE) {
         params.parse_special = true; // parse special tokens by default, like the old tokenize tool
+    } else if (ex == LLAMA_EXAMPLE_FINETUNE) {
+        params.out_file = "finetuned-model.gguf";
     } else if (ex == LLAMA_EXAMPLE_TTS) {
         params.out_file = "output.wav";
         params.sampling.penalty_repeat = 1.05f;
