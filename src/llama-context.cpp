@@ -2327,6 +2327,12 @@ uint32_t llama_context::graph_max_nodes(uint32_t n_tokens) const {
     if (n_sampling_outputs_max > 1) {
         res += (n_sampling_outputs_max - 1) * n_sampling_nodes_max;
     }
+
+    // training reuses this graph for the backward pass and the optimizer step, both need extra nodes
+    if (is_training) {
+        res *= 4;
+    }
+
     return res;
 }
 
@@ -3305,11 +3311,17 @@ static void llama_set_param(struct ggml_tensor * tensor, llama_opt_param_filter 
 
 void llama_context::opt_init(struct llama_model * model, struct llama_opt_params lopt_params) {
     GGML_ASSERT(!opt_ctx);
-    model->hparams.n_ctx_train = lopt_params.n_ctx_train > 0 ? lopt_params.n_ctx_train : n_ctx();
-    const uint32_t n_batch     = std::min(this->n_batch(),  model->hparams.n_ctx_train);
-    const uint32_t n_ubatch    = std::min(this->n_ubatch(), n_batch);
-    GGML_ASSERT(model->hparams.n_ctx_train % n_batch  == 0);
+    // do not touch model->hparams, it is written back out by llama_model_save_to_file
+    n_ctx_train_opt         = lopt_params.n_ctx_train > 0 ? lopt_params.n_ctx_train : n_ctx();
+    const uint32_t n_batch  = std::min(this->n_batch(),  n_ctx_train_opt);
+    const uint32_t n_ubatch = std::min(this->n_ubatch(), n_batch);
+    GGML_ASSERT(n_ctx_train_opt % n_batch  == 0);
     GGML_ASSERT(n_batch                    % n_ubatch == 0);
+
+    // re-reserve before creating opt_ctx, it keeps a pointer to sched
+    is_training        = true;
+    sched_need_reserve = true;
+    sched_reserve();
 
     ggml_opt_params opt_params = ggml_opt_default_params(sched.get(), GGML_OPT_LOSS_TYPE_CROSS_ENTROPY);
     opt_params.opt_period      = n_batch / n_ubatch;
@@ -3356,7 +3368,7 @@ void llama_context::opt_epoch_iter(
         int64_t                          ndata_in_loop,
         int64_t                          t_loop_start) {
     GGML_ASSERT(opt_ctx);
-    const uint32_t n_ctx    = llama_model_n_ctx_train(&model);
+    const uint32_t n_ctx    = n_ctx_train_opt;
     const uint32_t n_batch  = std::min(this->n_batch(),  n_ctx);
     const uint32_t n_ubatch = std::min(this->n_ubatch(), n_batch);
 

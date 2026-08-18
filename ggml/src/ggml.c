@@ -7267,6 +7267,11 @@ void ggml_build_backward_expand(
                 ignore_src[1] = true;
                 break;
 
+            case GGML_OP_SET_ROWS:      // row indices not differentiable, gradients in the destination are irrelevant
+                ignore_src[1] = true;
+                ignore_src[2] = true;
+                break;
+
             default:
                 break;
         }
@@ -7283,8 +7288,10 @@ void ggml_build_backward_expand(
         }
 
         // inplace operations are currently not supported
+        // SET_ROWS is the kv cache write - like CPY it returns a view of the destination
         GGML_ASSERT(!node->view_src || node->op == GGML_OP_CPY || node->op == GGML_OP_VIEW ||
-            node->op == GGML_OP_RESHAPE || node->op == GGML_OP_PERMUTE || node->op == GGML_OP_TRANSPOSE);
+            node->op == GGML_OP_RESHAPE || node->op == GGML_OP_PERMUTE || node->op == GGML_OP_TRANSPOSE ||
+            node->op == GGML_OP_SET_ROWS);
 
         const size_t ihash = ggml_hash_find(&cgraph->visited_hash_set, node);
         GGML_ASSERT(ihash != GGML_HASHSET_FULL);

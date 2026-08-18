@@ -349,6 +349,11 @@ private:
     std::vector<ggml_backend_ptr> backends;
 
     // training
+    bool is_training = false;
+
+    // sequence length used for training, does not change the model's own n_ctx_train
+    uint32_t n_ctx_train_opt = 0;
+
     ggml_opt_context_t opt_ctx = nullptr;
 
     ggml_threadpool_t threadpool       = nullptr;
