@@ -233,7 +233,11 @@ void llama_model_saver::add_kv_from_model() {
     add_kv(LLM_KV_NEXTN_PREDICT_LAYERS,              hparams.n_layer_nextn);
     add_kv(LLM_KV_NUM_DEEPSTACK_LAYERS,              hparams.n_deepstack_layers);
     add_kv(LLM_KV_DEEPSTACK_MAPPING,                 hparams.deepstack_mapping_arr);
-    add_kv(LLM_KV_POOLING_TYPE,                      uint32_t(hparams.pooling_type));
+    // only write the pooling type if the model has one, some downstream tools read the
+    // presence of this key as "this is an embedding model"
+    if (hparams.pooling_type != LLAMA_POOLING_TYPE_UNSPECIFIED) {
+        add_kv(LLM_KV_POOLING_TYPE,                  uint32_t(hparams.pooling_type));
+    }
     add_kv(LLM_KV_LOGIT_SCALE,                       hparams.f_logit_scale);
     add_kv(LLM_KV_DECODER_START_TOKEN_ID,            hparams.dec_start_token_id);
     add_kv(LLM_KV_DECODER_BLOCK_COUNT,               hparams.dec_n_layer);
@@ -354,6 +358,12 @@ void llama_model_saver::add_kv_from_model() {
     add_kv(LLM_KV_TOKENIZER_FIM_REP_ID,              uint32_t(vocab.token_fim_rep()));
     add_kv(LLM_KV_TOKENIZER_FIM_SEP_ID,              uint32_t(vocab.token_fim_sep()));
 
+    // the chat template is only kept in gguf_kv, without it the saved model cannot chat
+    const auto & it_chat_template = model->gguf_kv.find(llm_kv(LLM_KV_TOKENIZER_CHAT_TEMPLATE));
+    if (it_chat_template != model->gguf_kv.end()) {
+        add_kv(LLM_KV_TOKENIZER_CHAT_TEMPLATE,       it_chat_template->second.c_str());
+    }
+
     // TODO: implement LoRA support
     // add_kv(LLM_KV_ADAPTER_TYPE,                      ???);
     // add_kv(LLM_KV_ADAPTER_LORA_ALPHA,                ???);
@@ -367,7 +377,9 @@ void llama_model_saver::add_kv_from_model() {
     add_kv(LLM_KV_CONVNEXT_EMBEDDING_LENGTH,         hparams.convnext.n_embd);
     add_kv(LLM_KV_CONVNEXT_BLOCK_COUNT,              hparams.convnext.n_layer);
 
-    add_kv(LLM_KV_CLASSIFIER_OUTPUT_LABELS,          model->classifier_labels);
+    if (!model->classifier_labels.empty()) {
+        add_kv(LLM_KV_CLASSIFIER_OUTPUT_LABELS,      model->classifier_labels);
+    }
 
     add_kv(LLM_KV_SHORTCONV_L_CACHE,                 hparams.n_shortconv_l_cache);
 
